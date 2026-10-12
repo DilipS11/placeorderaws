@@ -1,6 +1,6 @@
-# SvelteKit Order & Points Management System
+# placeorderaws - SvelteKit Order & Points Management System
 
-A standard, clean demo business application created with SvelteKit. All frontend modules interact directly with the backend endpoints via standard HTTP REST API methods.
+A standard business portal built with SvelteKit with live AWS Lambda / API Gateway integration.
 
 ---
 
@@ -11,56 +11,49 @@ A standard, clean demo business application created with SvelteKit. All frontend
 - `src/routes/api/customers/+server.js`: API endpoints for Customers (`GET`, `POST`, `PATCH`, `DELETE`).
 - `src/routes/api/orders/+server.js`: API endpoints for Bulk Orders (`GET`, `POST`).
 - `src/routes/api/points/+server.js`: API endpoints for Points (`GET`, `POST`).
-- `src/routes/+layout.svelte`: App shell with navigation bar and clean business styling.
+- `src/routes/+layout.svelte`: Modern card & Inter UI shell with navigation bar.
 - `src/routes/+page.svelte`: Home dashboard with metric totals and API overview.
 - `src/routes/products/+page.svelte`: Products UI (Create, Edit, Delete, Filter, View).
 - `src/routes/customers/+page.svelte`: Customers UI (Create, Edit, Delete, Search, View).
 - `src/routes/orders/+page.svelte`: Bulk Order placement UI with multi-line calculation and Order History.
 - `src/routes/points/+page.svelte`: Points Wallet UI (Balance check, Assign points, Deduct points).
+- `src/routes/register/+page.svelte`: Customer Registration page connected to live AWS API.
+- `src/routes/customer/[id]/+page.svelte`: Customer Dashboard displaying live points and AWS data.
 
 ---
 
 ## 2. API Endpoints Specification
 
-### 1. Products API (`/api/products`)
-| Method | Query / Body | Description |
-|---|---|---|
-| `GET` | `?search=...&category=...` | List all products or filter by query |
-| `POST` | `{ productId, name, category, points, amount, imageUrl }` | Create new product |
-| `PATCH` | `{ productId, name, category, points, amount, imageUrl }` | Update existing product |
-| `DELETE` | `?productId=...` or `{ productId: "..." }` | Delete a product |
+### AWS API Endpoint
+```
+https://2rn9ci2zh4.execute-api.ap-south-1.amazonaws.com/dev/api
+```
+- `POST /customers`: Register customer
+- `GET /customers/{id}`: Customer details & Available Points
+- `GET /products`: Product items catalog
 
-### 2. Customers API (`/api/customers`)
-| Method | Query / Body | Description |
-|---|---|---|
-| `GET` | `?customerId=...` or `?search=...` | List all customers or get single customer |
-| `POST` | `{ customerId, name, country, address1, address2, city, state, zipCode, email, contactPhone, availablePoints }` | Create customer |
-| `PATCH` | `{ customerId, ...fieldsToUpdate }` | Update customer record |
-| `DELETE` | `?customerId=...` | Delete a customer |
-
-### 3. Orders API (`/api/orders`)
-| Method | Query / Body | Description |
-|---|---|---|
-| `GET` | `?customerId=...` or `?orderId=...` | Fetch orders history with line items |
-| `POST` | `{ customerId, items: [ { productId, quantity } ] }` | Place Bulk Order. Generates `OrderId`, `OrderLineId` items, computes `OrderAmount` & `TotalPoints`, and credits points to customer balance. |
-
-### 4. Points API (`/api/points`)
-| Method | Query / Body | Description |
-|---|---|---|
-| `GET` | `?customerId=...` | Fetch customer points balance |
-| `POST` | `{ customerId, action: 'ASSIGN' \| 'DEDUCT', points: number, reason?: string }` | Assign or deduct points with balance checks |
+### Internal SvelteKit REST Endpoints (`/api/*`)
+| Resource | Methods | Route | Description |
+|---|---|---|---|
+| Products | `GET`, `POST`, `PATCH`, `DELETE` | `/api/products` | Catalog CRUD with price, reward points & image URL |
+| Customers | `GET`, `POST`, `PATCH`, `DELETE` | `/api/customers` | Customer directory with address and points balance |
+| Orders | `GET`, `POST` | `/api/orders` | Bulk ordering, header & line items calculations |
+| Points | `GET`, `POST` | `/api/points` | Query balance, assign points & deduct points |
 
 ---
 
 ## 3. Running the Project
 
 ```bash
+# Install dependencies
+npm install
+
 # Start development server
 npm run dev
 
-# Or build and preview
+# Or build for production
 npm run build
 npm run preview
 ```
 
-Server runs by default at `http://localhost:5173`.
+Default local server: `http://localhost:5173`
