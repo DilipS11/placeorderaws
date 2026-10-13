@@ -15,12 +15,31 @@
 	let message = $state('');
 	let error = $state('');
 
+	function parseList(data, key) {
+		if (!data) return [];
+		if (Array.isArray(data)) return data;
+		if (data.body) {
+			try {
+				const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+				if (Array.isArray(parsed)) return parsed;
+				if (parsed && Array.isArray(parsed[key])) return parsed[key];
+				if (parsed && typeof parsed === 'object') {
+					const found = Object.values(parsed).find((v) => Array.isArray(v));
+					if (found) return found;
+				}
+			} catch (_) {}
+		}
+		if (data[key] && Array.isArray(data[key])) return data[key];
+		return [];
+	}
+
 	async function loadCustomers() {
 		try {
 			const res = await fetch('/api/customers');
-			customers = await res.json();
+			const data = await res.json();
+			customers = parseList(data, 'customers');
 			if (customers.length > 0 && !selectedCustomerId) {
-				selectedCustomerId = customers[0].customerId;
+				selectedCustomerId = customers[0].CustomerId || customers[0].customerId;
 				await fetchCustomerBalance(selectedCustomerId);
 			}
 		} catch (e) {
@@ -37,7 +56,7 @@
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || 'Failed to fetch points');
 			balanceInfo = data;
-			selectedCustomer = customers.find((c) => c.customerId === custId) || null;
+			selectedCustomer = customers.find((c) => (c.customerId === custId || c.CustomerId === custId)) || null;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -132,8 +151,9 @@
 			<label for="selectCust">Customer Account</label>
 			<select id="selectCust" value={selectedCustomerId} onchange={handleCustomerChange}>
 				{#each customers as c}
-					<option value={c.customerId}>
-						{c.name} ({c.customerId})
+					{@const id = c.CustomerId || c.customerId}
+					<option value={id}>
+						{c.name} ({id})
 					</option>
 				{/each}
 			</select>
@@ -231,18 +251,19 @@
 			</thead>
 			<tbody>
 				{#each customers as c}
+					{@const id = c.CustomerId || c.customerId}
 					<tr>
-						<td><strong style="color: #111827;">{c.customerId}</strong></td>
+						<td><strong style="color: #111827;">{id}</strong></td>
 						<td><span style="font-weight: 500;">{c.name}</span></td>
 						<td>{c.email || '-'}</td>
 						<td style="text-align: right; font-weight: 700; color: #2563eb;">
-							{c.availablePoints} pts
+							{c.availablePoints ?? 0} pts
 						</td>
 						<td style="text-align: center;">
 							<button
 								onclick={() => {
-									selectedCustomerId = c.customerId;
-									fetchCustomerBalance(c.customerId);
+									selectedCustomerId = id;
+									fetchCustomerBalance(id);
 								}}
 							>
 								Select Account
