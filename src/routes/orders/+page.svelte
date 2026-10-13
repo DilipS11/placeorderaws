@@ -17,6 +17,24 @@
 	// Filter state for orders list
 	let filterCustomerId = $state('');
 
+	function parseList(data, key) {
+		if (!data) return [];
+		if (Array.isArray(data)) return data;
+		if (data.body) {
+			try {
+				const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+				if (Array.isArray(parsed)) return parsed;
+				if (parsed && Array.isArray(parsed[key])) return parsed[key];
+				if (parsed && typeof parsed === 'object') {
+					const found = Object.values(parsed).find((v) => Array.isArray(v));
+					if (found) return found;
+				}
+			} catch (_) {}
+		}
+		if (data[key] && Array.isArray(data[key])) return data[key];
+		return [];
+	}
+
 	async function loadInitialData() {
 		loading = true;
 		error = '';
@@ -26,15 +44,19 @@
 				fetch('/api/products'),
 				fetch('/api/orders')
 			]);
-			customers = await cRes.json();
-			products = await pRes.json();
-			orders = await oRes.json();
+			const cData = await cRes.json();
+			const pData = await pRes.json();
+			const oData = await oRes.json();
+
+			customers = parseList(cData, 'customers');
+			products = parseList(pData, 'products');
+			orders = Array.isArray(oData) ? oData : parseList(oData, 'orders');
 
 			if (customers.length > 0 && !selectedCustomerId) {
-				selectedCustomerId = customers[0].customerId;
+				selectedCustomerId = customers[0].CustomerId || customers[0].customerId;
 			}
-			if (products.length > 0 && orderLines[0].productId === '') {
-				orderLines[0].productId = products[0].productId;
+			if (products.length > 0 && (!orderLines[0]?.productId || orderLines[0]?.productId === '')) {
+				orderLines[0].productId = products[0].ProductId || products[0].productId;
 			}
 		} catch (e) {
 			error = e.message;
@@ -50,14 +72,15 @@
 				: '/api/orders';
 			const res = await fetch(url);
 			if (!res.ok) throw new Error('Failed to load orders');
-			orders = await res.json();
+			const data = await res.json();
+			orders = Array.isArray(data) ? data : parseList(data, 'orders');
 		} catch (e) {
 			error = e.message;
 		}
 	}
 
 	function addOrderLine() {
-		const defaultProdId = products.length > 0 ? products[0].productId : '';
+		const defaultProdId = products.length > 0 ? (products[0].ProductId || products[0].productId || '') : '';
 		orderLines = [...orderLines, { productId: defaultProdId, quantity: 1 }];
 	}
 
@@ -67,6 +90,9 @@
 	}
 
 	function getLineCalculation(line) {
+		if (!Array.isArray(products) || products.length === 0) {
+			return { unitPrice: 0, unitPoints: 0, totalPrice: '0.00', totalPoints: 0 };
+		}
 		const prod = products.find((p) => (p.productId === line.productId || p.ProductId === line.productId));
 		const qty = Number(line.quantity) || 0;
 		if (!prod) return { unitPrice: 0, unitPoints: 0, totalPrice: '0.00', totalPoints: 0 };
@@ -181,8 +207,9 @@
 			<label for="orderCustomer">Select Customer *</label>
 			<select id="orderCustomer" bind:value={selectedCustomerId}>
 				{#each customers as c}
-					<option value={c.customerId}>
-						{c.name} ({c.customerId}) &bull; Current Balance: {c.availablePoints} pts
+					{@const id = c.CustomerId || c.customerId}
+					<option value={id}>
+						{c.name} ({id}) &bull; Current Balance: {c.availablePoints ?? 0} pts
 					</option>
 				{/each}
 			</select>
@@ -217,8 +244,9 @@
 							<td>
 								<select bind:value={line.productId}>
 									{#each products as p}
-										<option value={p.productId || p.ProductId}>
-											{p.name} ({p.productId || p.ProductId}) - ${p.amount ?? p.price} / {p.points} pts
+										{@const id = p.ProductId || p.productId}
+										<option value={id}>
+											{p.name} ({id}) - ${p.amount ?? p.price} / {p.points ?? 0} pts
 										</option>
 									{/each}
 								</select>
@@ -284,7 +312,8 @@
 			<select bind:value={filterCustomerId} onchange={fetchOrders} style="max-width: 220px;">
 				<option value="">All Customers</option>
 				{#each customers as c}
-					<option value={c.customerId}>{c.name} ({c.customerId})</option>
+					{@const id = c.CustomerId || c.customerId}
+					<option value={id}>{c.name} ({id})</option>
 				{/each}
 			</select>
 			{#if filterCustomerId}
@@ -297,7 +326,7 @@
 		<p style="padding: 20px; color: #6b7280; text-align: center;">No orders found.</p>
 	{:else}
 		{#each orders as o (o.orderId)}
-			{@const cust = customers.find((c) => c.customerId === o.customerId)}
+			{@const cust = customers.find((c) => (c.customerId === o.customerId || c.CustomerId === o.customerId))}
 			<div class="order-box">
 				<div class="order-header-bar">
 					<div style="display: flex; align-items: center; gap: 12px;">

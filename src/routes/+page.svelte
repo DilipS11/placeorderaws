@@ -8,6 +8,24 @@
 		totalRevenue: 0
 	});
 
+	function parseList(data, key) {
+		if (!data) return [];
+		if (Array.isArray(data)) return data;
+		if (data.body) {
+			try {
+				const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+				if (Array.isArray(parsed)) return parsed;
+				if (parsed && Array.isArray(parsed[key])) return parsed[key];
+				if (parsed && typeof parsed === 'object') {
+					const found = Object.values(parsed).find((v) => Array.isArray(v));
+					if (found) return found;
+				}
+			} catch (_) {}
+		}
+		if (data[key] && Array.isArray(data[key])) return data[key];
+		return [];
+	}
+
 	async function loadDashboard() {
 		try {
 			const [pRes, cRes, oRes] = await Promise.all([
@@ -15,9 +33,13 @@
 				fetch('/api/customers'),
 				fetch('/api/orders')
 			]);
-			const products = await pRes.json();
-			const customers = await cRes.json();
-			const orders = await oRes.json();
+			const pData = await pRes.json();
+			const cData = await cRes.json();
+			const oData = await oRes.json();
+
+			const products = parseList(pData, 'products');
+			const customers = parseList(cData, 'customers');
+			const orders = Array.isArray(oData) ? oData : parseList(oData, 'orders');
 
 			const totalRevenue = orders.reduce((sum, o) => sum + (o.orderAmount || 0), 0);
 
