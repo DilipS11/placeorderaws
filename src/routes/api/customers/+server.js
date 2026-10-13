@@ -1,140 +1,156 @@
 import { json } from '@sveltejs/kit';
-import { readDb, writeDb } from '#lib/server/db.js';
 
-// GET /api/customers - list all customers or search
-export async function GET({ url }) {
-	const db = readDb();
-	const search = url.searchParams.get('search');
-	const customerId = url.searchParams.get('customerId');
+const AWS_API_URL =
+  'https://2rn9ci2zh4.execute-api.ap-south-1.amazonaws.com/dev/api/customers';
 
-	if (customerId) {
-		const cust = db.customers.find((c) => c.customerId === customerId);
-		if (!cust) return json({ error: 'Customer not found' }, { status: 404 });
-		return json(cust);
-	}
+// GET /api/customers - fetch all customers or customer by id from AWS
+export async function GET({ url, fetch }) {
+  try {
+    const customerId = url.searchParams.get('id') || url.searchParams.get('customerId');
+    const endpoint = customerId
+      ? `${AWS_API_URL}/${encodeURIComponent(customerId)}`
+      : AWS_API_URL;
 
-	let customers = db.customers;
-	if (search) {
-		const q = search.toLowerCase();
-		customers = customers.filter(
-			(c) =>
-				c.name.toLowerCase().includes(q) ||
-				c.customerId.toLowerCase().includes(q) ||
-				c.email.toLowerCase().includes(q)
-		);
-	}
+    const response = await fetch(endpoint);
+    const data = await response.text();
 
-	return json(customers);
+    return new Response(data, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('AWS API error:', error);
+
+    return json(
+      { message: 'Unable to connect to AWS API' },
+      { status: 502 }
+    );
+  }
 }
 
-// POST /api/customers - create customer
-export async function POST({ request }) {
-	try {
-		const payload = await request.json();
-		const db = readDb();
+// POST /api/customers - create customer in AWS
+export async function POST({ request, fetch }) {
+  try {
+    const customerData = await request.json();
 
-		const customerId = payload.customerId?.trim() || `CUST-${Date.now().toString().slice(-4)}`;
+    if (!customerData.name) {
+      return json(
+        { message: 'Name is required' },
+        { status: 400 }
+      );
+    }
 
-		if (!payload.name) {
-			return json({ error: 'Customer name is required' }, { status: 400 });
-		}
+    const response = await fetch(AWS_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(customerData)
+    });
 
-		if (db.customers.some((c) => c.customerId === customerId)) {
-			return json({ error: `Customer with ID ${customerId} already exists` }, { status: 409 });
-		}
+    const responseText = await response.text();
 
-		const newCustomer = {
-			customerId,
-			name: String(payload.name).trim(),
-			country: payload.country ? String(payload.country).trim() : '',
-			address1: payload.address1 ? String(payload.address1).trim() : '',
-			address2: payload.address2 ? String(payload.address2).trim() : '',
-			city: payload.city ? String(payload.city).trim() : '',
-			state: payload.state ? String(payload.state).trim() : '',
-			zipCode: payload.zipCode ? String(payload.zipCode).trim() : '',
-			email: payload.email ? String(payload.email).trim() : '',
-			contactPhone: payload.contactPhone ? String(payload.contactPhone).trim() : '',
-			availablePoints: Number(payload.availablePoints) || 0
-		};
+    return new Response(responseText, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('Create customer error:', error);
 
-		db.customers.push(newCustomer);
-		writeDb(db);
-
-		return json(newCustomer, { status: 201 });
-	} catch (err) {
-		return json({ error: err.message }, { status: 500 });
-	}
+    return json(
+      { message: 'Unable to create customer' },
+      { status: 502 }
+    );
+  }
 }
 
 // PATCH /api/customers - update customer
-export async function PATCH({ request }) {
-	try {
-		const payload = await request.json();
-		if (!payload.customerId) {
-			return json({ error: 'customerId is required to update' }, { status: 400 });
-		}
+export async function PATCH({ request, fetch }) {
+  try {
+    const customerData = await request.json();
+    const customerId = customerData.CustomerId || customerData.customerId;
 
-		const db = readDb();
-		const index = db.customers.findIndex((c) => c.customerId === payload.customerId);
+    if (!customerId) {
+      return json(
+        { message: 'Customer ID is required' },
+        { status: 400 }
+      );
+    }
 
-		if (index === -1) {
-			return json({ error: 'Customer not found' }, { status: 404 });
-		}
+    const response = await fetch(`${AWS_API_URL}/${encodeURIComponent(customerId)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(customerData)
+    });
 
-		const current = db.customers[index];
-		const updatedCustomer = {
-			...current,
-			name: payload.name !== undefined ? String(payload.name).trim() : current.name,
-			country: payload.country !== undefined ? String(payload.country).trim() : current.country,
-			address1: payload.address1 !== undefined ? String(payload.address1).trim() : current.address1,
-			address2: payload.address2 !== undefined ? String(payload.address2).trim() : current.address2,
-			city: payload.city !== undefined ? String(payload.city).trim() : current.city,
-			state: payload.state !== undefined ? String(payload.state).trim() : current.state,
-			zipCode: payload.zipCode !== undefined ? String(payload.zipCode).trim() : current.zipCode,
-			email: payload.email !== undefined ? String(payload.email).trim() : current.email,
-			contactPhone: payload.contactPhone !== undefined ? String(payload.contactPhone).trim() : current.contactPhone,
-			availablePoints:
-				payload.availablePoints !== undefined
-					? Number(payload.availablePoints)
-					: current.availablePoints
-		};
+    const responseText = await response.text();
 
-		db.customers[index] = updatedCustomer;
-		writeDb(db);
+    return new Response(responseText, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('Update customer error:', error);
 
-		return json(updatedCustomer);
-	} catch (err) {
-		return json({ error: err.message }, { status: 500 });
-	}
+    return json(
+      { message: 'Unable to update customer' },
+      { status: 502 }
+    );
+  }
 }
 
 // DELETE /api/customers - delete customer
-export async function DELETE({ url, request }) {
-	try {
-		let customerId = url.searchParams.get('customerId');
-		if (!customerId) {
-			try {
-				const body = await request.json();
-				customerId = body.customerId;
-			} catch (_) {}
-		}
+export async function DELETE({ url, request, fetch }) {
+  try {
+    let customerId = url.searchParams.get('id') || url.searchParams.get('customerId');
+    if (!customerId) {
+      try {
+        const body = await request.json();
+        customerId = body.CustomerId || body.customerId;
+      } catch (_) {}
+    }
 
-		if (!customerId) {
-			return json({ error: 'customerId is required to delete' }, { status: 400 });
-		}
+    if (!customerId) {
+      return json(
+        { message: 'Customer ID is required' },
+        { status: 400 }
+      );
+    }
 
-		const db = readDb();
-		const index = db.customers.findIndex((c) => c.customerId === customerId);
+    const response = await fetch(`${AWS_API_URL}/${encodeURIComponent(customerId)}`, {
+      method: 'DELETE'
+    });
 
-		if (index === -1) {
-			return json({ error: 'Customer not found' }, { status: 404 });
-		}
+    const responseText = await response.text();
 
-		const removed = db.customers.splice(index, 1)[0];
-		writeDb(db);
+    return new Response(responseText || null, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('Delete customer error:', error);
 
-		return json({ message: 'Customer deleted successfully', customer: removed });
-	} catch (err) {
-		return json({ error: err.message }, { status: 500 });
-	}
+    return json(
+      { message: 'Unable to delete customer' },
+      { status: 502 }
+    );
+  }
 }

@@ -12,22 +12,44 @@
 	// Form model
 	let isEditing = $state(false);
 	let form = $state({
-		productId: '',
+		ProductId: '',
 		name: '',
 		category: '',
 		points: 0,
-		amount: 0,
-		imageUrl: ''
+		price: 0,
+		imageURL: ''
 	});
 
 	async function fetchProducts() {
 		loading = true;
 		error = '';
 		try {
-			const url = searchQuery ? `/api/products?search=${encodeURIComponent(searchQuery)}` : '/api/products';
-			const res = await fetch(url);
-			if (!res.ok) throw new Error('Failed to fetch products');
-			products = await res.json();
+			const response = await fetch('/api/products');
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.message ?? 'Failed to fetch products');
+			}
+
+			let list = [];
+			if (data && data.body) {
+				const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+				list = parsed.products || (Array.isArray(parsed) ? parsed : []);
+			} else if (Array.isArray(data)) {
+				list = data;
+			} else if (data && data.products) {
+				list = data.products;
+			}
+
+			if (searchQuery) {
+				const q = searchQuery.toLowerCase();
+				list = list.filter((p) =>
+					[p.ProductId, p.productId, p.name, p.category]
+						.some((v) => v && String(v).toLowerCase().includes(q))
+				);
+			}
+
+			products = list;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -38,45 +60,62 @@
 	function resetForm() {
 		isEditing = false;
 		form = {
-			productId: '',
+			ProductId: '',
 			name: '',
 			category: '',
 			points: 0,
-			amount: 0,
-			imageUrl: ''
+			price: 0,
+			imageURL: ''
 		};
 	}
 
 	function handleEdit(prod) {
 		isEditing = true;
-		form = { ...prod };
+		const id = prod.ProductId || prod.productId || '';
+		form = {
+			ProductId: id,
+			name: prod.name || '',
+			category: prod.category || '',
+			points: prod.points || 0,
+			price: prod.price ?? prod.amount ?? 0,
+			imageURL: prod.imageURL || prod.imageUrl || ''
+		};
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
-	async function handleSubmit(e) {
+	async function handleSubmit(e, ProductId) {
 		e.preventDefault();
 		error = '';
 		message = '';
 
 		try {
-			if (isEditing) {
-				const res = await fetch('/api/products', {
-					method: 'PATCH',
+			const targetId = ProductId || form.ProductId;
+			if (isEditing && targetId) {
+				const res = await fetch('/api/products/' + encodeURIComponent(targetId), {
+					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(form)
+					body: JSON.stringify({
+						...form,
+						amount: form.price,
+						imageUrl: form.imageURL
+					})
 				});
 				const data = await res.json();
-				if (!res.ok) throw new Error(data.error || 'Failed to update product');
-				message = `Product ${data.productId} updated successfully (PATCH).`;
+				if (!res.ok) throw new Error(data.message || data.error || 'Failed to update product');
+				message = `Product ${targetId} updated successfully (PUT).`;
 			} else {
 				const res = await fetch('/api/products', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(form)
+					body: JSON.stringify({
+						...form,
+						amount: form.price,
+						imageUrl: form.imageURL
+					})
 				});
 				const data = await res.json();
-				if (!res.ok) throw new Error(data.error || 'Failed to create product');
-				message = `Product ${data.productId} created successfully (POST).`;
+				if (!res.ok) throw new Error(data.message || data.error || 'Failed to create product');
+				message = `Product created successfully (POST).`;
 			}
 			resetForm();
 			await fetchProducts();
@@ -85,18 +124,18 @@
 		}
 	}
 
-	async function handleDelete(productId) {
-		if (!confirm(`Are you sure you want to delete product "${productId}"?`)) return;
+	async function handleDelete(ProductId) {
+		if (!confirm(`Are you sure you want to delete product "${ProductId}"?`)) return;
 		error = '';
 		message = '';
 
 		try {
-			const res = await fetch(`/api/products?productId=${encodeURIComponent(productId)}`, {
+			const res = await fetch(`/api/products/${encodeURIComponent(ProductId)}`, {
 				method: 'DELETE'
 			});
 			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || 'Failed to delete product');
-			message = `Product ${productId} deleted successfully (DELETE).`;
+			if (!res.ok) throw new Error(data.message || data.error || 'Failed to delete product');
+			message = `Product ${ProductId} deleted successfully (DELETE).`;
 			await fetchProducts();
 		} catch (e) {
 			error = e.message;
@@ -117,7 +156,7 @@
 		<div>
 			<h1 style="margin: 0 0 4px 0; font-size: 24px; color: #111827;">Products Catalog</h1>
 			<p style="color: #6b7280; margin: 0; font-size: 14px;">
-				Supported API Methods: <code>GET</code>, <code>POST</code>, <code>PATCH</code>, <code>DELETE</code>
+				Supported API Methods: <code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code> &bull; AWS Integrated
 			</p>
 		</div>
 		<div>
@@ -137,19 +176,19 @@
 <div class="card">
 	<div class="form-header">
 		<h2 style="margin: 0; font-size: 18px;">
-			{isEditing ? 'Edit Product (PATCH /api/products)' : 'Add New Product (POST /api/products)'}
+			{isEditing ? 'Edit Product (PUT /api/products/[id])' : 'Add New Product (POST /api/products)'}
 		</h2>
 		<p style="color: #6b7280; font-size: 13px; margin: 4px 0 0 0;">Fill in the product pricing, points and media info.</p>
 	</div>
 
-	<form onsubmit={handleSubmit} style="margin-top: 18px;">
+	<form onsubmit={(event) => handleSubmit(event, form.ProductId)} style="margin-top: 18px;">
 		<div class="form-grid">
 			<div class="field">
-				<label for="productId">Product ID</label>
+				<label for="ProductId">Product ID</label>
 				<input
-					id="productId"
+					id="ProductId"
 					type="text"
-					bind:value={form.productId}
+					bind:value={form.ProductId}
 					placeholder={isEditing ? '' : 'Auto-generated if left blank'}
 					disabled={isEditing}
 				/>
@@ -177,13 +216,13 @@
 			</div>
 
 			<div class="field">
-				<label for="amount">Price ($) *</label>
+				<label for="price">Price ($) *</label>
 				<input
-					id="amount"
+					id="price"
 					type="number"
 					step="0.01"
 					min="0"
-					bind:value={form.amount}
+					bind:value={form.price}
 					placeholder="89.99"
 					required
 				/>
@@ -203,11 +242,11 @@
 			</div>
 
 			<div class="field full-width">
-				<label for="imageUrl">Image URL</label>
+				<label for="imageURL">Image URL</label>
 				<input
-					id="imageUrl"
+					id="imageURL"
 					type="url"
-					bind:value={form.imageUrl}
+					bind:value={form.imageURL}
 					placeholder="https://images.unsplash.com/photo-..."
 				/>
 			</div>
@@ -215,7 +254,7 @@
 
 		<div style="margin-top: 18px; display: flex; gap: 10px;">
 			<button type="submit" class="btn-primary">
-				{isEditing ? 'Save Changes (PATCH)' : 'Create Product (POST)'}
+				{isEditing ? 'Save Changes (PUT)' : 'Create Product (POST)'}
 			</button>
 			{#if isEditing}
 				<button type="button" class="btn-secondary" onclick={resetForm}>Cancel</button>
@@ -262,12 +301,13 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each products as prod (prod.productId)}
+					{#each products as prod (prod.ProductId || prod.productId)}
+						{@const id = prod.ProductId || prod.productId}
 						<tr>
 							<td style="text-align: center;">
-								{#if prod.imageUrl || prod.imageURL}
+								{#if prod.imageURL || prod.imageUrl}
 									<img
-										src={prod.imageUrl || prod.imageURL}
+										src={prod.imageURL || prod.imageUrl}
 										alt={prod.name}
 										style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;"
 									/>
@@ -277,11 +317,11 @@
 									</div>
 								{/if}
 							</td>
-							<td><strong style="color: #111827;">{prod.productId || prod.ProductId}</strong></td>
+							<td><strong style="color: #111827;">{id}</strong></td>
 							<td><span style="font-weight: 500;">{prod.name}</span></td>
 							<td><span class="category-badge">{prod.category || 'General'}</span></td>
 							<td style="text-align: right; font-weight: 600; color: #059669;">
-								${Number(prod.amount ?? prod.price ?? 0).toFixed(2)}
+								${Number(prod.price ?? prod.amount ?? 0).toFixed(2)}
 							</td>
 							<td style="text-align: right; font-weight: 600; color: #2563eb;">
 								{prod.points} pts
@@ -289,7 +329,7 @@
 							<td style="text-align: center;">
 								<div style="display: flex; gap: 6px; justify-content: center;">
 									<button onclick={() => handleEdit(prod)}>Edit</button>
-									<button class="btn-danger" onclick={() => handleDelete(prod.productId || prod.ProductId)}>Delete</button>
+									<button class="btn-danger" onclick={() => handleDelete(id)}>Delete</button>
 								</div>
 							</td>
 						</tr>

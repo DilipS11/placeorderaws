@@ -8,42 +8,52 @@ const initialData = {
 	products: [
 		{
 			productId: 'PROD-001',
+			ProductId: 'PROD-001',
 			name: 'Mechanical Keyboard',
 			category: 'Electronics',
 			points: 50,
 			amount: 89.99,
+			price: 89.99,
 			imageUrl: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=300'
 		},
 		{
 			productId: 'PROD-002',
+			ProductId: 'PROD-002',
 			name: 'Ergonomic Mouse',
 			category: 'Electronics',
 			points: 30,
 			amount: 49.99,
+			price: 49.99,
 			imageUrl: 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=300'
 		},
 		{
 			productId: 'PROD-003',
+			ProductId: 'PROD-003',
 			name: 'Noise Cancelling Headphones',
 			category: 'Audio',
 			points: 100,
 			amount: 199.99,
+			price: 199.99,
 			imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300'
 		},
 		{
 			productId: 'PROD-004',
+			ProductId: 'PROD-004',
 			name: 'Stainless Steel Water Bottle',
 			category: 'Lifestyle',
 			points: 15,
 			amount: 24.50,
+			price: 24.50,
 			imageUrl: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=300'
 		}
 	],
 	customers: [
 		{
 			customerId: 'CUST-001',
+			CustomerId: 'CUST-001',
 			name: 'Alice Johnson',
 			country: 'USA',
+			address: '123 Market St',
 			address1: '123 Market St',
 			address2: 'Apt 4B',
 			city: 'San Francisco',
@@ -55,8 +65,10 @@ const initialData = {
 		},
 		{
 			customerId: 'CUST-002',
+			CustomerId: 'CUST-002',
 			name: 'Bob Smith',
 			country: 'USA',
+			address: '456 Elm Ave',
 			address1: '456 Elm Ave',
 			address2: 'Suite 200',
 			city: 'Austin',
@@ -72,6 +84,7 @@ const initialData = {
 			orderId: 'ORD-1001',
 			orderDate: '2026-10-10T14:32:00.000Z',
 			customerId: 'CUST-001',
+			CustomerId: 'CUST-001',
 			orderAmount: 139.98,
 			totalPoints: 80,
 			items: [
@@ -79,6 +92,7 @@ const initialData = {
 					orderId: 'ORD-1001',
 					orderLineId: '1',
 					productId: 'PROD-001',
+					ProductId: 'PROD-001',
 					quantity: 1,
 					unitPrice: 89.99,
 					unitPoints: 50,
@@ -89,6 +103,7 @@ const initialData = {
 					orderId: 'ORD-1001',
 					orderLineId: '2',
 					productId: 'PROD-002',
+					ProductId: 'PROD-002',
 					quantity: 1,
 					unitPrice: 49.99,
 					unitPoints: 30,

@@ -1,152 +1,158 @@
 import { json } from '@sveltejs/kit';
-import { readDb, writeDb } from '#lib/server/db.js';
 
-// GET /api/products - list all products or filter by category/search
-export async function GET({ url }) {
-	const db = readDb();
-	const category = url.searchParams.get('category');
-	const search = url.searchParams.get('search');
+const AWS_API_URL =
+  'https://2rn9ci2zh4.execute-api.ap-south-1.amazonaws.com/dev/api/products';
 
-	let products = [...db.products];
+// GET /api/products - list all products or filter by product id
+export async function GET({ url, fetch }) {
+  try {
+    const ProductId = url.searchParams.get('id') || url.searchParams.get('productId');
 
-	// Sync products from AWS endpoint if available
-	try {
-		const res = await fetch("https://2rn9ci2zh4.execute-api.ap-south-1.amazonaws.com/dev/api/products");
-		if (res.ok) {
-			const data = await res.json();
-			const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data;
-			const awsList = parsed.products || [];
-			for (const item of awsList) {
-				const prodId = item.ProductId || item.productId;
-				if (!products.some(p => p.productId === prodId)) {
-					products.push({
-						productId: prodId,
-						name: item.name,
-						category: item.category || 'General',
-						points: Number(item.points) || 0,
-						amount: Number(item.price ?? item.amount) || 0,
-						imageUrl: item.imageURL || item.imageUrl || ''
-					});
-				}
-			}
-		}
-	} catch (e) {
-		// fallback to local data silently
-	}
+    const endpoint = ProductId
+      ? `${AWS_API_URL}/${encodeURIComponent(ProductId)}`
+      : AWS_API_URL;
 
-	if (category) {
-		products = products.filter(
-			(p) => p.category.toLowerCase() === category.toLowerCase()
-		);
-	}
-	if (search) {
-		const q = search.toLowerCase();
-		products = products.filter(
-			(p) =>
-				p.name.toLowerCase().includes(q) ||
-				p.productId.toLowerCase().includes(q) ||
-				p.category.toLowerCase().includes(q)
-		);
-	}
+    const response = await fetch(endpoint);
+    const data = await response.text();
 
-	return json(products);
+    return new Response(data, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('AWS API error:', error);
+
+    return json(
+      { message: 'Unable to connect to AWS API' },
+      { status: 502 }
+    );
+  }
 }
 
 // POST /api/products - create product
-export async function POST({ request }) {
-	try {
-		const payload = await request.json();
-		const db = readDb();
+export async function POST({ request, fetch }) {
+  try {
+    const productData = await request.json();
 
-		const productId = payload.productId?.trim() || `PROD-${Date.now().toString().slice(-4)}`;
-		
-		if (!payload.name) {
-			return json({ error: 'Product name is required' }, { status: 400 });
-		}
+    if (!productData.name) {
+      return json(
+        { message: 'Name is required' },
+        { status: 400 }
+      );
+    }
 
-		if (db.products.some((p) => p.productId === productId)) {
-			return json({ error: `Product with ID ${productId} already exists` }, { status: 409 });
-		}
+    const response = await fetch(AWS_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(productData)
+    });
 
-		const newProduct = {
-			productId,
-			name: String(payload.name).trim(),
-			category: payload.category ? String(payload.category).trim() : 'General',
-			points: Number(payload.points) || 0,
-			amount: Number(payload.amount) || 0,
-			imageUrl: payload.imageUrl ? String(payload.imageUrl).trim() : ''
-		};
+    const responseText = await response.text();
 
-		db.products.push(newProduct);
-		writeDb(db);
+    return new Response(responseText, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('Create product error:', error);
 
-		return json(newProduct, { status: 201 });
-	} catch (err) {
-		return json({ error: err.message }, { status: 500 });
-	}
+    return json(
+      { message: 'Unable to create product' },
+      { status: 502 }
+    );
+  }
 }
 
-// PATCH /api/products - update product
-export async function PATCH({ request }) {
-	try {
-		const payload = await request.json();
-		if (!payload.productId) {
-			return json({ error: 'productId is required to update' }, { status: 400 });
-		}
-
-		const db = readDb();
-		const index = db.products.findIndex((p) => p.productId === payload.productId);
-
-		if (index === -1) {
-			return json({ error: 'Product not found' }, { status: 404 });
-		}
-
-		const current = db.products[index];
-		const updatedProduct = {
-			...current,
-			name: payload.name !== undefined ? String(payload.name).trim() : current.name,
-			category: payload.category !== undefined ? String(payload.category).trim() : current.category,
-			points: payload.points !== undefined ? Number(payload.points) : current.points,
-			amount: payload.amount !== undefined ? Number(payload.amount) : current.amount,
-			imageUrl: payload.imageUrl !== undefined ? String(payload.imageUrl).trim() : current.imageUrl
-		};
-
-		db.products[index] = updatedProduct;
-		writeDb(db);
-
-		return json(updatedProduct);
-	} catch (err) {
-		return json({ error: err.message }, { status: 500 });
-	}
+// PUT or PATCH /api/products - update product
+export async function PUT({ request, fetch }) {
+  return handleUpdate(request, fetch);
 }
 
-// DELETE /api/products - delete product (by query ?productId=... or json payload)
-export async function DELETE({ url, request }) {
-	try {
-		let productId = url.searchParams.get('productId');
-		if (!productId) {
-			try {
-				const body = await request.json();
-				productId = body.productId;
-			} catch (_) {}
-		}
+export async function PATCH({ request, fetch }) {
+  return handleUpdate(request, fetch);
+}
 
-		if (!productId) {
-			return json({ error: 'productId is required to delete' }, { status: 400 });
-		}
+async function handleUpdate(request, fetch) {
+  try {
+    const payload = await request.json();
+    const ProductId = payload.ProductId || payload.productId;
 
-		const db = readDb();
-		const index = db.products.findIndex((p) => p.productId === productId);
+    if (!ProductId) {
+      return json({ error: 'ProductId is required to update' }, { status: 400 });
+    }
 
-		if (index === -1) {
-			return json({ error: 'Product not found' }, { status: 404 });
-		}
+    const response = await fetch(`${AWS_API_URL}/${encodeURIComponent(ProductId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-		const removed = db.products.splice(index, 1)[0];
-		writeDb(db);
+    const responseText = await response.text();
 
-		return json({ message: 'Product deleted successfully', product: removed });
-	} catch (err) {
-		return json({ error: err.message }, { status: 500 });
-	}
+    return new Response(responseText, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (err) {
+    return json({ error: err.message }, { status: 500 });
+  }
+}
+
+// DELETE /api/products - delete product (by query or body)
+export async function DELETE({ url, request, fetch }) {
+  try {
+    let ProductId = url.searchParams.get('id') || url.searchParams.get('productId');
+    if (!ProductId) {
+      try {
+        const body = await request.json();
+        ProductId = body.ProductId || body.productId;
+      } catch (_) {}
+    }
+
+    if (!ProductId) {
+      return json(
+        { message: 'Product ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const response = await fetch(
+      `${AWS_API_URL}/${encodeURIComponent(ProductId)}`,
+      {
+        method: 'DELETE'
+      }
+    );
+
+    const responseText = await response.text();
+
+    return new Response(responseText || null, {
+      status: response.status,
+      headers: {
+        'Content-Type':
+          response.headers.get('content-type') ??
+          'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('Delete product error:', error);
+
+    return json(
+      { message: 'Unable to delete product' },
+      { status: 502 }
+    );
+  }
 }

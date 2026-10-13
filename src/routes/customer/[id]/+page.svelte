@@ -12,11 +12,11 @@
 	let cartCount = $state(0);
 	let activeTab = $state('orders'); // 'orders' | 'customers'
 
-	// Mock/seed customers for navigation
+	// Seed customers for navigation
 	let customersList = $state([
-		{ id: 'b2535d22-4788-41bb-be01-9e8b2360d61e', code: 'C001', name: 'Alice Johnson', email: 'alice@example.com', phone: '9876543210', status: 'Active', date: '2026-10-01' },
-		{ id: '28cbe4fc-1660-4799-820b-26d664cf86d8', code: 'C002', name: 'Bob Smith', email: 'bob@example.com', phone: '9876543211', status: 'Active', date: '2026-10-03' },
-		{ id: 'd3422c43-1f4c-4156-8c67-1e8d83a432d2', code: 'C003', name: 'Charlie Brown', email: 'charlie@example.com', phone: '9876543212', status: 'Active', date: '2026-10-05' }
+		{ id: '1', code: 'C001', name: 'Divyalak', email: 'divya@gmail.com', phone: '988123741', status: 'Active', date: '2026-10-01' },
+		{ id: 'b2535d22-4788-41bb-be01-9e8b2360d61e', code: 'C002', name: 'Alice Johnson', email: 'alice@example.com', phone: '9876543210', status: 'Active', date: '2026-10-03' },
+		{ id: '28cbe4fc-1660-4799-820b-26d664cf86d8', code: 'C003', name: 'Bob Smith', email: 'bob@example.com', phone: '9876543211', status: 'Active', date: '2026-10-05' }
 	]);
 
 	// Customer's orders
@@ -44,12 +44,13 @@
 	);
 
 	async function loadCustomerData(custid) {
+		if (!custid) custid = '1';
 		loading = true;
 		error = '';
 		try {
-			// Fetch from AWS Endpoint
-			let res = await fetch(`${CUSTOMER_ORDER_ENDPOINT}/customers/${custid}`);
-			let data = await res.json();
+			// Fetch from AWS via API route
+			const res = await fetch(`/api/customers/${custid}`);
+			const data = await res.json();
 			
 			if (data && data.body) {
 				customer = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
@@ -81,7 +82,6 @@
 	}
 
 	onMount(async () => {
-		// Extract custid from route params /customer/[id] or fallback to default
 		let custid = page.params.id;
 		if (!custid) {
 			try {
@@ -93,7 +93,7 @@
 		}
 
 		if (!custid) {
-			custid = 'b2535d22-4788-41bb-be01-9e8b2360d61e';
+			custid = '1';
 		}
 
 		await loadCustomerData(custid);
@@ -109,29 +109,11 @@
 {:else if error}
 	<div style="padding: 30px;">
 		<div class="alert alert-error">Error: {error}</div>
-		<button onclick={() => loadCustomerData('b2535d22-4788-41bb-be01-9e8b2360d61e')}>Load Default Customer</button>
+		<button onclick={() => loadCustomerData('1')}>Load Default Customer</button>
 	</div>
 {:else}
 <div class="app">
-	<header>
-		<h2><span class="logo">S</span> AWS Integration Demo</h2>
-		<div class="header-right">
-			<div class="cart">
-				🛒 Cart <span>{cartCount}</span>
-			</div>
-			<div class="profile">👤 {customer.name || 'User'}</div>
-		</div>
-	</header>
-
 	<div class="layout">
-		<aside>
-			<a class="active" href="/customer/{customer.CustomerId || customer.customerId}">⌂ Dashboard</a>
-			<a href="/products">◇ Products</a>
-			<a href="/orders">▤ Bulk Orders</a>
-			<a href="/points">🪙 Points Wallet</a>
-			<a class="logout" href="/">↪ Main Portal</a>
-		</aside>
-
 		<main>
 			<h1>Customer Dashboard</h1>
 			<p class="subtitle">Live AWS Integration &bull; Endpoint: <code>{CUSTOMER_ORDER_ENDPOINT}</code></p>
@@ -171,13 +153,13 @@
 			</section>
 
 			<!-- Quick switch customer demo bar -->
-			<div style="background: white; border: 1px solid #e1e8f4; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+			<div style="background: white; border: 1px solid #e1e8f4; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
 				<span style="font-weight: 600; color: #536784;">Switch AWS Customer:</span>
 				{#each customersList as c}
 					<a
 						href="/customer/{c.id}"
 						class="badge"
-						style="text-decoration: none; cursor: pointer; {(customer.CustomerId === c.id || customer.customerId === c.code) ? 'background: #1765ed; color: white;' : ''}"
+						style="text-decoration: none; cursor: pointer; {(customer.CustomerId === c.id || customer.customerId === c.code || customer.CustomerId === c.code) ? 'background: #1765ed; color: white;' : ''}"
 						onclick={() => loadCustomerData(c.id)}
 					>
 						{c.name} ({c.code})
@@ -306,18 +288,8 @@
 	:global(body) { margin: 0; font-family: Arial, sans-serif; color: #172b4d; background: #f6f8fc; font-size: 14px; }
 	button, input { font: inherit; }
 	button { cursor: pointer; }
-	header { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; background: white; border-bottom: 1px solid #e4eaf3; }
-	header h2 { display: flex; align-items: center; gap: 10px; font-size: 21px; margin: 0; }
-	.logo { background: #1765ed; color: white; padding: 7px 11px; border-radius: 9px; }
-	.header-right { display: flex; align-items: center; gap: 20px; }
-	.cart span { background: #1765ed; color: white; padding: 2px 7px; border-radius: 12px; font-size: 11px; }
-	.profile { color: #536784; font-weight: 500; }
-	.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: calc(100vh - 72px); }
-	aside { display: flex; flex-direction: column; gap: 8px; padding: 22px 12px; background: white; border-right: 1px solid #e4eaf3; }
-	aside a { padding: 12px 14px; border-radius: 8px; text-decoration: none; color: #536784; font-size: 14px; }
-	aside a.active { background: #eaf1ff; color: #1765ed; font-weight: 600; }
-	aside a.logout { margin-top: auto; }
-	main { min-width: 0; padding: 30px; }
+	.layout { display: grid; min-height: calc(100vh - 120px); }
+	main { min-width: 0; padding: 10px 0; }
 	h1 { font-size: 28px; margin: 0 0 8px; }
 	.subtitle { color: #71819b; margin: 0 0 24px; }
 	.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -330,7 +302,7 @@
 	.stats p { color: #71819b; margin: 0 0 6px; font-size: 12px; }
 	.stats h2 { margin: 0; font-size: 24px; }
 	.panel { background: white; border: 1px solid #e1e8f4; border-radius: 12px; padding: 20px; }
-	.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 12px; }
+	.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 12px; flex-wrap: wrap; }
 	.primary { background: #1765ed; color: white; border: 0; border-radius: 7px; padding: 10px 16px; font-weight: 500; }
 	.primary:hover { background: #0e50ca; }
 	.tab-btn { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 7px; padding: 10px 16px; }
@@ -349,13 +321,10 @@
 	.pagination { display: flex; align-items: center; gap: 12px; }
 	.pagination button { border: 1px solid #dfe6f0; background: white; padding: 5px 12px; border-radius: 6px; font-size: 16px; }
 	.pagination button:disabled { opacity: .4; cursor: not-allowed; }
-	@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } main { padding: 22px; } }
+	@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } main { padding: 15px; } }
 	@media (max-width: 650px) {
 		.layout { grid-template-columns: 1fr; }
-		aside { flex-direction: row; flex-wrap: wrap; padding: 8px; }
-		aside a { padding: 10px; }
-		aside a.logout { margin-top: 0; }
-		main { padding: 14px; }
+		main { padding: 10px; }
 		h1 { font-size: 24px; }
 		.stats { gap: 9px; }
 		.stats article { padding: 12px 9px; gap: 8px; }

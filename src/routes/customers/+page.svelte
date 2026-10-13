@@ -12,7 +12,7 @@
 	// Form state
 	let isEditing = $state(false);
 	let form = $state({
-		customerId: '',
+		CustomerId: '',
 		name: '',
 		country: '',
 		address1: '',
@@ -25,14 +25,37 @@
 		availablePoints: 0
 	});
 
-	async function fetchCustomers() {
+	async function getAllCustomers() {
 		loading = true;
 		error = '';
+
 		try {
-			const url = searchQuery ? `/api/customers?search=${encodeURIComponent(searchQuery)}` : '/api/customers';
-			const res = await fetch(url);
-			if (!res.ok) throw new Error('Failed to fetch customers');
-			customers = await res.json();
+			const response = await fetch('/api/customers');
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.message ?? 'Failed to fetch customers');
+			}
+
+			let list = [];
+			if (data && data.body) {
+				const parsed = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+				list = parsed.customers || (Array.isArray(parsed) ? parsed : []);
+			} else if (Array.isArray(data)) {
+				list = data;
+			} else if (data && data.customers) {
+				list = data.customers;
+			}
+
+			if (searchQuery) {
+				const q = searchQuery.toLowerCase();
+				list = list.filter((c) =>
+					[c.CustomerId, c.customerId, c.name, c.email, c.contactPhone, c.phone]
+						.some((v) => v && String(v).toLowerCase().includes(q))
+				);
+			}
+
+			customers = list;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -43,7 +66,7 @@
 	function resetForm() {
 		isEditing = false;
 		form = {
-			customerId: '',
+			CustomerId: '',
 			name: '',
 			country: '',
 			address1: '',
@@ -59,25 +82,38 @@
 
 	function handleEdit(c) {
 		isEditing = true;
-		form = { ...c };
+		form = {
+			CustomerId: c.CustomerId || c.customerId || '',
+			name: c.name || '',
+			country: c.country || '',
+			address1: c.address1 || c.address || '',
+			address2: c.address2 || '',
+			city: c.city || '',
+			state: c.state || '',
+			zipCode: c.zipCode || '',
+			email: c.email || '',
+			contactPhone: c.contactPhone || c.phone || '',
+			availablePoints: c.availablePoints || 0
+		};
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
-	async function handleSubmit(e) {
+	async function handleSubmit(e, customerId) {
 		e.preventDefault();
 		error = '';
 		message = '';
 
 		try {
-			if (isEditing) {
-				const res = await fetch('/api/customers', {
-					method: 'PATCH',
+			const targetId = customerId || form.CustomerId;
+			if (isEditing && targetId) {
+				const res = await fetch('/api/customers/' + encodeURIComponent(targetId), {
+					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(form)
 				});
 				const data = await res.json();
-				if (!res.ok) throw new Error(data.error || 'Failed to update customer');
-				message = `Customer ${data.customerId} updated successfully (PATCH).`;
+				if (!res.ok) throw new Error(data.message || data.error || 'Failed to update customer');
+				message = `Customer ${targetId} updated successfully (PUT).`;
 			} else {
 				const res = await fetch('/api/customers', {
 					method: 'POST',
@@ -85,36 +121,36 @@
 					body: JSON.stringify(form)
 				});
 				const data = await res.json();
-				if (!res.ok) throw new Error(data.error || 'Failed to create customer');
-				message = `Customer ${data.customerId} created successfully (POST).`;
+				if (!res.ok) throw new Error(data.message || data.error || 'Failed to create customer');
+				message = `Customer created successfully (POST).`;
 			}
 			resetForm();
-			await fetchCustomers();
+			await getAllCustomers();
 		} catch (e) {
 			error = e.message;
 		}
 	}
 
-	async function handleDelete(customerId) {
-		if (!confirm(`Are you sure you want to delete customer "${customerId}"?`)) return;
+	async function handleDelete(CustomerId) {
+		if (!confirm(`Are you sure you want to delete customer "${CustomerId}"?`)) return;
 		error = '';
 		message = '';
 
 		try {
-			const res = await fetch(`/api/customers?customerId=${encodeURIComponent(customerId)}`, {
+			const res = await fetch(`/api/customers/${encodeURIComponent(CustomerId)}`, {
 				method: 'DELETE'
 			});
 			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || 'Failed to delete customer');
-			message = `Customer ${customerId} deleted successfully (DELETE).`;
-			await fetchCustomers();
+			if (!res.ok) throw new Error(data.message || data.error || 'Failed to delete customer');
+			message = `Customer ${CustomerId} deleted successfully (DELETE).`;
+			await getAllCustomers();
 		} catch (e) {
 			error = e.message;
 		}
 	}
 
 	onMount(() => {
-		fetchCustomers();
+		getAllCustomers();
 	});
 </script>
 
@@ -127,14 +163,14 @@
 		<div>
 			<h1 style="margin: 0 0 4px 0; font-size: 24px; color: #111827;">Customers Management</h1>
 			<p style="color: #6b7280; margin: 0; font-size: 14px;">
-				Supported API Methods: <code>GET</code>, <code>POST</code>, <code>PATCH</code>, <code>DELETE</code>
+				Supported API Methods: <code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code> &bull; AWS Integrated
 			</p>
 		</div>
 		<div style="display: flex; gap: 10px;">
 			<a href="/register" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; padding: 9px 16px;">
 				+ Register Customer Form
 			</a>
-			<button class="btn-secondary" onclick={fetchCustomers}>↻ Refresh Data</button>
+			<button class="btn-secondary" onclick={getAllCustomers}>↻ Refresh Data</button>
 		</div>
 	</div>
 
@@ -150,19 +186,19 @@
 <div class="card">
 	<div class="form-header">
 		<h2 style="margin: 0; font-size: 18px;">
-			{isEditing ? 'Edit Customer (PATCH /api/customers)' : 'Add New Customer (POST /api/customers)'}
+			{isEditing ? 'Edit Customer (PUT /api/customers/[id])' : 'Add New Customer (POST /api/customers)'}
 		</h2>
 		<p style="color: #6b7280; font-size: 13px; margin: 4px 0 0 0;">Customer profile with contact and location details.</p>
 	</div>
 
-	<form onsubmit={handleSubmit} style="margin-top: 18px;">
+	<form onsubmit={(event) => handleSubmit(event, form.CustomerId)} style="margin-top: 18px;">
 		<div class="form-grid">
 			<div class="field">
-				<label for="customerId">Customer ID</label>
+				<label for="CustomerId">Customer ID</label>
 				<input
-					id="customerId"
+					id="CustomerId"
 					type="text"
-					bind:value={form.customerId}
+					bind:value={form.CustomerId}
 					placeholder={isEditing ? '' : 'Auto-generated if left blank'}
 					disabled={isEditing}
 				/>
@@ -180,12 +216,13 @@
 			</div>
 
 			<div class="field">
-				<label for="email">Email</label>
+				<label for="email">Email *</label>
 				<input
 					id="email"
 					type="email"
 					bind:value={form.email}
 					placeholder="albert@example.com"
+					required
 				/>
 			</div>
 
@@ -263,7 +300,7 @@
 
 		<div style="margin-top: 18px; display: flex; gap: 10px;">
 			<button type="submit" class="btn-primary">
-				{isEditing ? 'Save Changes (PATCH)' : 'Create Customer (POST)'}
+				{isEditing ? 'Save Changes (PUT)' : 'Create Customer (POST)'}
 			</button>
 			{#if isEditing}
 				<button type="button" class="btn-secondary" onclick={resetForm}>Cancel</button>
@@ -281,12 +318,12 @@
 				type="text"
 				placeholder="Search by name, email, id..."
 				bind:value={searchQuery}
-				onkeydown={(e) => e.key === 'Enter' && fetchCustomers()}
+				onkeydown={(e) => e.key === 'Enter' && getAllCustomers()}
 				style="max-width: 260px;"
 			/>
-			<button class="btn-primary" onclick={fetchCustomers}>Search</button>
+			<button class="btn-primary" onclick={getAllCustomers}>Search</button>
 			{#if searchQuery}
-				<button class="btn-secondary" onclick={() => { searchQuery = ''; fetchCustomers(); }}>Clear</button>
+				<button class="btn-secondary" onclick={() => { searchQuery = ''; getAllCustomers(); }}>Clear</button>
 			{/if}
 		</div>
 	</div>
@@ -310,27 +347,28 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each customers as c (c.customerId)}
+					{#each customers as c (c.CustomerId || c.customerId)}
+						{@const id = c.CustomerId || c.customerId}
 						<tr>
-							<td><strong style="color: #111827;">{c.customerId}</strong></td>
+							<td><strong style="color: #111827;">{id}</strong></td>
 							<td><span style="font-weight: 500;">{c.name}</span></td>
 							<td>{c.email || '-'}</td>
-							<td>{c.contactPhone || '-'}</td>
+							<td>{c.contactPhone || c.phone || '-'}</td>
 							<td>{[c.city, c.state, c.country].filter(Boolean).join(', ') || '-'}</td>
 							<td style="text-align: right; font-weight: 700; color: #2563eb;">
-								{c.availablePoints} pts
+								{c.availablePoints ?? 0} pts
 							</td>
 							<td style="text-align: center;">
 								<div style="display: flex; gap: 6px; justify-content: center;">
 									<a
-										href="/customer/{c.customerId}"
+										href="/customer/{id}"
 										class="badge-link"
 										title="Open AWS Customer Dashboard"
 									>
 										Dashboard
 									</a>
 									<button onclick={() => handleEdit(c)}>Edit</button>
-									<button class="btn-danger" onclick={() => handleDelete(c.customerId)}>Delete</button>
+									<button class="btn-danger" onclick={() => handleDelete(id)}>Delete</button>
 								</div>
 							</td>
 						</tr>
