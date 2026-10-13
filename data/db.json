@@ -1,0 +1,96 @@
+{
+  "products": [],
+  "customers": [
+    {
+      "customerId": "4d10f84a-5523-4889-b737-d8d6ebba8481",
+      "name": "Dilip Saga",
+      "country": "India",
+      "address1": "Machohalli",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "zipCode": "560091",
+      "email": "dilipsaga11@gmail.com",
+      "contactPhone": "12345647656876",
+      "availablePoints": 0
+    }
+  ],
+  "orders": [
+    {
+      "orderId": "ORD-795396",
+      "orderDate": "2026-10-12T16:33:15.396Z",
+      "customerId": "CUST-001",
+      "orderAmount": 179.98,
+      "totalPoints": 100,
+      "items": [
+        {
+          "orderId": "ORD-795396",
+          "orderLineId": "1",
+          "productId": "PROD-001",
+          "quantity": 2,
+          "unitPrice": 89.99,
+          "unitPoints": 50,
+          "totalPrice": 179.98,
+          "totalPoints": 100
+        }
+      ]
+    },
+    {
+      "orderId": "ORD-428935",
+      "orderDate": "2026-10-12T16:10:28.935Z",
+      "customerId": "CUST-001",
+      "orderAmount": 229.97,
+      "totalPoints": 130,
+      "items": [
+        {
+          "orderId": "ORD-428935",
+          "orderLineId": "1",
+          "productId": "PROD-001",
+          "quantity": 2,
+          "unitPrice": 89.99,
+          "unitPoints": 50,
+          "totalPrice": 179.98,
+          "totalPoints": 100
+        },
+        {
+          "orderId": "ORD-428935",
+          "orderLineId": "2",
+          "productId": "PROD-002",
+          "quantity": 1,
+          "unitPrice": 49.99,
+          "unitPoints": 30,
+          "totalPrice": 49.99,
+          "totalPoints": 30
+        }
+      ]
+    },
+    {
+      "orderId": "ORD-1001",
+      "orderDate": "2026-10-10T14:32:00.000Z",
+      "customerId": "CUST-001",
+      "orderAmount": 139.98,
+      "totalPoints": 80,
+      "items": [
+        {
+          "orderId": "ORD-1001",
+          "orderLineId": "1",
+          "productId": "PROD-001",
+          "quantity": 1,
+          "unitPrice": 89.99,
+          "unitPoints": 50,
+          "totalPrice": 89.99,
+          "totalPoints": 50
+        },
+        {
+          "orderId": "ORD-1001",
+          "orderLineId": "2",
+          "productId": "PROD-002",
+          "quantity": 1,
+          "unitPrice": 49.99,
+          "unitPoints": 30,
+          "totalPrice": 49.99,
+          "totalPoints": 30
+        }
+      ]
+    }
+  ]
+}
